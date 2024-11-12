@@ -33,11 +33,6 @@ namespace fileConverter.Services
         private void ProcessDirectory(string currentDirectory)
         {
             // Skip the 'lib' directory and its subdirectories
-            if (Path.GetFileName(currentDirectory).Equals("lib", StringComparison.OrdinalIgnoreCase))
-            {
-                return;
-            }
-
             string searchPattern = "index.html"; // Only search for index.html
             foreach (string filePath in Directory.GetFiles(currentDirectory, searchPattern))
             {
@@ -65,12 +60,21 @@ namespace fileConverter.Services
 
             try
             {
+                string? url = _fileHelper.ReadUrlFromHtml(filePath);
+                if (url == null)
+                {
+                    result.Success = false;
+                    result.ErrorMessage = "No valid URL found in the HTML file.";
+                    return result;
+                }
+
                 string directory = Path.GetDirectoryName(filePath) ?? throw new ArgumentNullException(nameof(filePath), "File path cannot be null");
                 result.NewPath = Path.Combine(directory, Path.GetFileNameWithoutExtension(filePath) + _config.TargetExtension);
                 result.RelativePath = _fileHelper.CalculateRelativePath(directory, _config.RootDirectory);
                 string newContent = GeneratePhpContent(result.RelativePath);
 
-                File.WriteAllText(result.NewPath, newContent, Encoding.UTF8);
+                // Write the new content in UTF-8 without BOM
+                File.WriteAllText(result.NewPath, newContent, new UTF8Encoding(false));
 
                 File.Delete(filePath);
             }
@@ -88,8 +92,9 @@ namespace fileConverter.Services
 require_once(""{relativePath}{_config.ConfigPath}"");
 ?>
 <script>
-    window.location.href = ""<?php echo $baseurl?>"";
+    window.location.href = ""<?php echo $baseurl?>""; 
 </script>";
         }
+    
     }
 }
